@@ -69,7 +69,7 @@ module Slug
     # Feel free to override this method if you'd like different slug formatting.
     def normalize_slug
       return if self[self.slug_column].blank?
-      s = ActiveSupport::Multibyte.proxy_class.new(self[self.slug_column]).normalize(:kc)
+      s = self[self.slug_column].unicode_normalize(:nfkc)
       s.downcase!
       s.strip!
       s.gsub!(/[^a-z0-9\s-]/, '') # Remove non-word characters
@@ -83,8 +83,7 @@ module Slug
     # Override this with a void function if you don't want accented characters to be stripped.
     def strip_diacritics_from_slug
       return if self[self.slug_column].blank?
-      s = ActiveSupport::Multibyte.proxy_class.new(self[self.slug_column])
-      s = s.normalize(:kd).unpack('U*')
+      s = self[self.slug_column].unicode_normalize(:nfkd).unpack('U*')
       s = s.inject([]) do |a,u|
         if Slug::ASCII_APPROXIMATIONS[u]
           a += Slug::ASCII_APPROXIMATIONS[u].unpack('U*')
@@ -107,7 +106,7 @@ module Slug
   
     # Returns the next unique index for a slug.
     def next_slug_sequence
-      last_in_sequence = self.class.where("#{self.slug_column} LIKE ?", self[self.slug_column] + '%').order("REPLACE(#{self.slug_column},'#{self[self.slug_column]}-','') DESC").first
+      last_in_sequence = self.class.where("#{self.slug_column} LIKE ?", self[self.slug_column] + '%').order(Arel.sql("REPLACE(#{self.slug_column},'#{self[self.slug_column]}-','') DESC")).first
       if last_in_sequence.nil?
         return 0
       else
